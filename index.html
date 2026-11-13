@@ -1,0 +1,800 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="apple-mobile-web-app-title" content="Expense Tracker">
+    <title id="appTitle">Monthly Expense Tracker</title>
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Chart.js -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <!-- FontAwesome -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        brand: { 50: '#eef2ff', 100: '#e0e7ff', 500: '#6366f1', 600: '#4f46e5', 700: '#4338ca' }
+                    }
+                }
+            }
+        }
+    </script>
+    <style>
+        body { -webkit-tap-highlight-color: transparent; font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; }
+        .safe-top { padding-top: env(safe-area-inset-top); }
+        .safe-bottom { padding-bottom: env(safe-area-inset-bottom); }
+    </style>
+</head>
+<body class="bg-slate-50 text-slate-800 min-h-screen pb-12">
+
+    <!-- Top Header Bar -->
+    <header class="bg-indigo-600 text-white shadow-md safe-top sticky top-0 z-30">
+        <div class="max-w-4xl mx-auto px-4 py-4 flex justify-between items-center">
+            <div>
+                <h1 class="text-xl font-bold flex items-center gap-2">
+                    <i class="fa-solid fa-wallet"></i> <span id="headerTitle">Expense Tracker</span>
+                </h1>
+                <p id="periodDisplay" class="text-xs text-indigo-200 mt-0.5">Budget Period: Loading...</p>
+            </div>
+            <button onclick="openSettingsModal()" class="bg-indigo-700 hover:bg-indigo-800 text-white px-3.5 py-2 rounded-xl text-xs font-semibold shadow transition flex items-center gap-1.5 border border-indigo-500">
+                <i class="fa-solid fa-gear"></i> <span id="btnSettings">Budget & Period</span>
+            </button>
+        </div>
+    </header>
+
+    <main class="max-w-4xl mx-auto px-4 pt-6 space-y-6">
+
+        <!-- KPI Summary Cards Grid with Layered Gradients -->
+        <div class="grid grid-cols-2 md:grid-cols-4 gap-3">
+            <!-- Total Spend -->
+            <div class="bg-gradient-to-br from-indigo-500 to-indigo-600 text-white p-4 rounded-2xl shadow-md border border-indigo-400/30 flex flex-col justify-between">
+                <div class="flex items-center justify-between text-indigo-100 text-xs font-semibold uppercase tracking-wider">
+                    <span id="lblTotalSpend">Total Spend</span>
+                    <i class="fa-solid fa-receipt text-indigo-200 bg-white/10 p-1.5 rounded-lg"></i>
+                </div>
+                <div class="mt-3">
+                    <span id="totalSpend" class="text-2xl font-black text-white">$0.00</span>
+                    <p id="totalCount" class="text-xs text-indigo-200 mt-0.5">0 transactions</p>
+                </div>
+            </div>
+
+            <!-- Remaining Budget -->
+            <div id="cardRemaining" class="bg-gradient-to-br from-emerald-500 to-emerald-600 text-white p-4 rounded-2xl shadow-md border border-emerald-400/30 flex flex-col justify-between transition-all">
+                <div class="flex items-center justify-between text-emerald-100 text-xs font-semibold uppercase tracking-wider">
+                    <span id="lblRemaining">Remaining Budget</span>
+                    <i id="budgetIcon" class="fa-solid fa-piggy-bank text-emerald-200 bg-white/10 p-1.5 rounded-lg"></i>
+                </div>
+                <div class="mt-3">
+                    <span id="remainingBudget" class="text-2xl font-black text-white">$0.00</span>
+                    <p id="budgetStatusText" class="text-xs text-emerald-100 mt-0.5">On Track</p>
+                </div>
+            </div>
+
+            <!-- Remaining Daily Budget -->
+            <div class="bg-gradient-to-br from-sky-500 to-sky-600 text-white p-4 rounded-2xl shadow-md border border-sky-400/30 flex flex-col justify-between">
+                <div class="flex items-center justify-between text-sky-100 text-xs font-semibold uppercase tracking-wider">
+                    <span id="lblDaily">Daily Allowance</span>
+                    <i class="fa-solid fa-calendar-day text-sky-200 bg-white/10 p-1.5 rounded-lg"></i>
+                </div>
+                <div class="mt-3">
+                    <span id="dailyAllowance" class="text-2xl font-black text-white">$0.00</span>
+                    <p id="daysRemainingText" class="text-xs text-sky-200 mt-0.5">0 days left</p>
+                </div>
+            </div>
+
+            <!-- High Expenses Flag -->
+            <div class="bg-gradient-to-br from-rose-500 to-rose-600 text-white p-4 rounded-2xl shadow-md border border-rose-400/30 flex flex-col justify-between">
+                <div class="flex items-center justify-between text-rose-100 text-xs font-semibold uppercase tracking-wider">
+                    <span id="lblHighExp">Over $100 Items</span>
+                    <i class="fa-solid fa-triangle-exclamation text-rose-200 bg-white/10 p-1.5 rounded-lg"></i>
+                </div>
+                <div class="mt-3">
+                    <span id="highExpenseCount" class="text-2xl font-black text-white">0</span>
+                    <p id="lblHighlighted" class="text-xs text-rose-200 mt-0.5">Highlighted in red</p>
+                </div>
+            </div>
+        </div>
+
+        <!-- Budget Progress Bar Card -->
+        <div class="bg-white p-5 rounded-2xl shadow-sm border border-slate-100 space-y-2">
+            <div class="flex justify-between items-center text-sm">
+                <span id="lblProgress" class="font-semibold text-slate-700">Budget Usage Progress</span>
+                <span id="budgetPercentage" class="font-bold text-slate-900">0%</span>
+            </div>
+            <div class="w-full bg-slate-100 rounded-full h-3 overflow-hidden">
+                <div id="progressBar" class="bg-emerald-500 h-3 rounded-full transition-all duration-500" style="width: 0%"></div>
+            </div>
+            <div class="flex justify-between text-xs text-slate-400 pt-1">
+                <span><span id="lblSpent">Spent</span>: <strong id="progressSpent" class="text-slate-600">$0.00</strong></span>
+                <span><span id="lblLimit">Budget Limit</span>: <strong id="progressLimit" class="text-slate-600">$0.00</strong></span>
+            </div>
+        </div>
+
+        <!-- Quick Add Expense Form -->
+        <div class="bg-white p-5 rounded-2xl shadow-sm border border-slate-100">
+            <h2 id="lblAddTitle" class="text-sm font-bold uppercase tracking-wider text-slate-600 mb-4 flex items-center gap-2">
+                <i class="fa-solid fa-plus-circle text-indigo-600"></i> Add New Expense
+            </h2>
+            <form id="expenseForm" onsubmit="addExpense(event)" class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-5 gap-3">
+                <div class="md:col-span-1">
+                    <label id="lblFormDate" class="block text-xs font-semibold text-slate-500 mb-1">Date</label>
+                    <input type="date" id="expenseDate" required class="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500">
+                </div>
+                <div class="md:col-span-1">
+                    <label id="lblFormCat" class="block text-xs font-semibold text-slate-500 mb-1">Category</label>
+                    <select id="expenseCategory" class="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500">
+                        <!-- Populated dynamically -->
+                    </select>
+                </div>
+                <div class="md:col-span-1">
+                    <label id="lblFormAmount" class="block text-xs font-semibold text-slate-500 mb-1">Amount ($)</label>
+                    <input type="number" id="expenseAmount" step="0.01" min="0.01" placeholder="0.00" required class="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500">
+                </div>
+                <div class="md:col-span-1">
+                    <label id="lblFormDesc" class="block text-xs font-semibold text-slate-500 mb-1">Description</label>
+                    <input type="text" id="expenseDesc" placeholder="e.g., Grocery shopping" required class="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500">
+                </div>
+                <div class="md:col-span-1 flex items-end">
+                    <button type="submit" id="btnAddBtn" class="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-semibold py-2.5 rounded-xl text-sm shadow transition flex items-center justify-center gap-2">
+                        <i class="fa-solid fa-plus"></i> Add
+                    </button>
+                </div>
+            </form>
+        </div>
+
+        <!-- Charts and Breakdown Section -->
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+            <div class="bg-white p-5 rounded-2xl shadow-sm border border-slate-100 md:col-span-1 flex flex-col items-center justify-center">
+                <h3 id="lblCatBreakdown" class="text-sm font-bold uppercase tracking-wider text-slate-600 mb-3 w-full text-left">Category Breakdown</h3>
+                <div class="w-full h-56 relative flex items-center justify-center">
+                    <canvas id="categoryChart"></canvas>
+                </div>
+            </div>
+
+            <!-- Expense List Table Container -->
+            <div class="bg-white p-5 rounded-2xl shadow-sm border border-slate-100 md:col-span-2 flex flex-col">
+                <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 mb-4">
+                    <h3 id="lblHistory" class="text-sm font-bold uppercase tracking-wider text-slate-600">Expense History</h3>
+                    <div class="flex items-center gap-2 w-full sm:w-auto">
+                        <label class="text-xs text-slate-400 flex items-center gap-1.5 cursor-pointer">
+                            <input type="checkbox" id="showAllToggle" onchange="renderApp()" class="rounded border-slate-300 text-indigo-600 focus:ring-indigo-500">
+                            <span id="lblShowAll">Show outside current period</span>
+                        </label>
+                        <button onclick="exportCSV()" class="bg-slate-100 hover:bg-slate-200 text-slate-700 px-3 py-1.5 rounded-xl text-xs font-semibold transition flex items-center gap-1.5">
+                            <i class="fa-solid fa-download"></i> <span id="lblExport">CSV</span>
+                        </button>
+                    </div>
+                </div>
+
+                <div class="overflow-x-auto flex-1 max-h-80">
+                    <table class="w-full text-left border-collapse">
+                        <thead>
+                            <tr class="border-b border-slate-100 text-xs text-slate-400 uppercase">
+                                <th id="tblDate" class="pb-2.5 font-medium">Date</th>
+                                <th id="tblDesc" class="pb-2.5 font-medium">Description</th>
+                                <th id="tblCat" class="pb-2.5 font-medium">Category</th>
+                                <th id="tblAmount" class="pb-2.5 font-medium text-right">Amount</th>
+                                <th id="tblAction" class="pb-2.5 font-medium text-center">Action</th>
+                            </tr>
+                        </thead>
+                        <tbody id="expenseTableBody" class="divide-y divide-slate-50 text-sm">
+                            <!-- Populated dynamically -->
+                        </tbody>
+                    </table>
+                </div>
+                <div id="emptyState" class="hidden py-8 text-center text-slate-400 text-sm">
+                    No expenses recorded for this period yet. Add one above!
+                </div>
+            </div>
+        </div>
+
+    </main>
+
+    <!-- Settings Modal -->
+    <div id="settingsModal" class="fixed inset-0 bg-slate-900/50 backdrop-blur-sm z-50 flex items-center justify-center p-4 hidden">
+        <div class="bg-white rounded-3xl max-w-lg w-full p-6 shadow-xl space-y-5 max-h-[90vh] overflow-y-auto">
+            <div class="flex justify-between items-center">
+                <h3 id="modalTitle" class="text-lg font-bold text-slate-900 flex items-center gap-2">
+                    <i class="fa-solid fa-gear text-indigo-600"></i> Budget & Period Settings
+                </h3>
+                <button onclick="closeSettingsModal()" class="text-slate-400 hover:text-slate-600 p-1">
+                    <i class="fa-solid fa-xmark text-lg"></i>
+                </button>
+            </div>
+            
+            <div class="space-y-4">
+                <div class="grid grid-cols-2 gap-3">
+                    <div>
+                        <label id="lblModalLimit" class="block text-xs font-semibold text-slate-500 mb-1">Monthly Budget Limit ($)</label>
+                        <input type="number" id="modalBudgetLimit" step="1" min="0" class="w-full bg-slate-50 border border-slate-200 rounded-xl px-3.5 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 font-bold">
+                    </div>
+                    <div>
+                        <label id="lblModalLang" class="block text-xs font-semibold text-slate-500 mb-1">Language / 語言</label>
+                        <select id="modalLanguage" class="w-full bg-slate-50 border border-slate-200 rounded-xl px-3.5 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500">
+                            <option value="en">English</option>
+                            <option value="zh">繁體中文</option>
+                        </select>
+                    </div>
+                </div>
+
+                <div>
+                    <label id="lblModalMode" class="block text-xs font-semibold text-slate-500 mb-1">Budget Period Mode</label>
+                    <select id="modalPeriodMode" onchange="togglePeriodMode()" class="w-full bg-slate-50 border border-slate-200 rounded-xl px-3.5 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500">
+                        <option value="calendar">Calendar Month (e.g., Nov 1 - Nov 30)</option>
+                        <option value="custom">Custom Date Range (Payday to Payday)</option>
+                    </select>
+                </div>
+
+                <div id="customDateFields" class="grid grid-cols-2 gap-3 hidden">
+                    <div>
+                        <label id="lblModalStart" class="block text-xs font-semibold text-slate-500 mb-1">Start Date</label>
+                        <input type="date" id="modalStartDate" class="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500">
+                    </div>
+                    <div>
+                        <label id="lblModalEnd" class="block text-xs font-semibold text-slate-500 mb-1">End Date</label>
+                        <input type="date" id="modalEndDate" class="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500">
+                    </div>
+                </div>
+
+                <div>
+                    <label id="lblModalCalMonth" class="block text-xs font-semibold text-slate-500 mb-1">Active Calendar Month Selector (for Calendar Mode)</label>
+                    <input type="month" id="modalCalendarMonth" class="w-full bg-slate-50 border border-slate-200 rounded-xl px-3.5 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500">
+                </div>
+
+                <!-- Emoji Customizer Section -->
+                <div class="border-t border-slate-100 pt-3">
+                    <label id="lblEmojiCustomizer" class="block text-xs font-bold uppercase tracking-wider text-slate-600 mb-2">Customize Category Emojis</label>
+                    <div id="emojiConfigContainer" class="grid grid-cols-2 gap-2.5">
+                        <!-- Populated dynamically -->
+                    </div>
+                </div>
+            </div>
+
+            <div class="pt-2 flex gap-3">
+                <button onclick="closeSettingsModal()" id="btnCancel" class="flex-1 bg-slate-100 hover:bg-slate-200 text-slate-700 font-semibold py-2.5 rounded-xl text-sm transition">Cancel</button>
+                <button onclick="saveSettings()" id="btnSave" class="flex-1 bg-indigo-600 hover:bg-indigo-700 text-white font-semibold py-2.5 rounded-xl text-sm shadow transition">Save Settings</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Application Script -->
+    <script>
+        // Translations Dictionary
+        const translations = {
+            en: {
+                appTitle: "Monthly Expense Tracker",
+                headerTitle: "Expense Tracker",
+                btnSettings: "Budget & Period",
+                lblTotalSpend: "Total Spend",
+                lblRemaining: "Remaining Budget",
+                lblDaily: "Daily Allowance",
+                lblHighExp: "Over $100 Items",
+                lblHighlighted: "Highlighted in red",
+                lblProgress: "Budget Usage Progress",
+                lblSpent: "Spent",
+                lblLimit: "Budget Limit",
+                lblAddTitle: "Add New Expense",
+                lblFormDate: "Date",
+                lblFormCat: "Category",
+                lblFormAmount: "Amount ($)",
+                lblFormDesc: "Description",
+                btnAddBtn: "Add",
+                lblCatBreakdown: "Category Breakdown",
+                lblHistory: "Expense History",
+                lblShowAll: "Show outside current period",
+                lblExport: "CSV",
+                tblDate: "Date",
+                tblDesc: "Description",
+                tblCat: "Category",
+                tblAmount: "Amount",
+                tblAction: "Action",
+                modalTitle: "Budget & Period Settings",
+                lblModalLimit: "Monthly Budget Limit ($)",
+                lblModalLang: "Language / 語言",
+                lblModalMode: "Budget Period Mode",
+                lblModalStart: "Start Date",
+                lblModalEnd: "End Date",
+                lblModalCalMonth: "Active Calendar Month Selector",
+                lblEmojiCustomizer: "Customize Category Emojis",
+                btnCancel: "Cancel",
+                btnSave: "Save Settings",
+                statusOnTrack: "On Track",
+                statusNearing: "Nearing Limit (80%+)",
+                statusOver: "Over Budget!",
+                categories: {
+                    "Food & Dining": "Food & Dining",
+                    "Transport": "Transport",
+                    "Shopping": "Shopping",
+                    "Bills & Utilities": "Bills & Utilities",
+                    "Entertainment": "Entertainment",
+                    "Other": "Other"
+                }
+            },
+            zh: {
+                appTitle: "每月開支追蹤器",
+                headerTitle: "開支追蹤器",
+                btnSettings: "預算與周期",
+                lblTotalSpend: "總支出",
+                lblRemaining: "剩餘預算",
+                lblDaily: "每日限額",
+                lblHighExp: "$100以上項目",
+                lblHighlighted: "以紅色突顯",
+                lblProgress: "預算使用進度",
+                lblSpent: "已花費",
+                lblLimit: "預算上限",
+                lblAddTitle: "新增開支",
+                lblFormDate: "日期",
+                lblFormCat: "類別",
+                lblFormAmount: "金額 ($)",
+                lblFormDesc: "備註 / 描述",
+                btnAddBtn: "新增",
+                lblCatBreakdown: "類別分佈",
+                lblHistory: "開支記錄",
+                lblShowAll: "顯示目前周期外的記錄",
+                lblExport: "匯出CSV",
+                tblDate: "日期",
+                tblDesc: "備註",
+                tblCat: "類別",
+                tblAmount: "金額",
+                tblAction: "操作",
+                modalTitle: "預算與周期設定",
+                lblModalLimit: "每月預算上限 ($)",
+                lblModalLang: "語言 / Language",
+                lblModalMode: "預算周期模式",
+                lblModalStart: "開始日期",
+                lblModalEnd: "結束日期",
+                lblModalCalMonth: "活躍日曆月份選擇",
+                lblEmojiCustomizer: "自訂類別表情符號 (Emojis)",
+                btnCancel: "取消",
+                btnSave: "儲存設定",
+                statusOnTrack: "進度良好",
+                statusNearing: "接近上限 (80%+)",
+                statusOver: "超出預算！",
+                categories: {
+                    "Food & Dining": "餐飲美食",
+                    "Transport": "交通出行",
+                    "Shopping": "購物消費",
+                    "Bills & Utilities": "賬單與水電",
+                    "Entertainment": "娛樂消遣",
+                    "Other": "其他雜項"
+                }
+            }
+        };
+
+        // State Management
+        let expenses = JSON.parse(localStorage.getItem('et_expenses')) || [
+            { id: 1, date: '2026-11-02', category: 'Food & Dining', amount: 125.50, description: 'Client business dinner' },
+            { id: 2, date: '2026-11-05', category: 'Transport', amount: 45.00, description: 'Monthly MTR pass top-up' },
+            { id: 3, date: '2026-11-08', category: 'Shopping', amount: 320.00, description: 'Wireless noise-cancelling headphones' },
+            { id: 4, date: '2026-11-10', category: 'Bills & Utilities', amount: 88.20, description: 'Electricity bill payment' }
+        ];
+
+        let settings = JSON.parse(localStorage.getItem('et_settings')) || {
+            limit: 2500,
+            mode: 'calendar',
+            calendarMonth: '2026-11',
+            startDate: '2026-10-25',
+            endDate: '2026-11-24',
+            language: 'en',
+            emojis: {
+                "Food & Dining": "🍔",
+                "Transport": "🚇",
+                "Shopping": "🛍️",
+                "Bills & Utilities": "💡",
+                "Entertainment": "🎮",
+                "Other": "📦"
+            }
+        };
+
+        let categoryChartInstance = null;
+
+        // Ensure default date picker in form has today's date if empty
+        if (!document.getElementById('expenseDate').value) {
+            const todayStr = new Date().toISOString().split('T')[0];
+            document.getElementById('expenseDate').value = todayStr;
+        }
+
+        function getActivePeriodRange() {
+            let start, end;
+            if (settings.mode === 'calendar') {
+                const calMonthStr = settings.calendarMonth || '2026-11';
+                const [year, month] = calMonthStr.split('-').map(Number);
+                start = new Date(year, month - 1, 1);
+                end = new Date(year, month, 0);
+            } else {
+                start = new Date(settings.startDate || '2026-10-25');
+                end = new Date(settings.endDate || '2026-11-24');
+            }
+            return { start, end };
+        }
+
+        function formatDateStr(date) {
+            const lang = settings.language;
+            return date.toLocaleDateString(lang === 'zh' ? 'zh-HK' : 'en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+        }
+
+        function renderApp() {
+            try {
+                localStorage.setItem('et_expenses', JSON.stringify(expenses));
+                localStorage.setItem('et_settings', JSON.stringify(settings));
+            } catch(e) {
+                console.error("Storage error:", e);
+            }
+
+            const t = translations[settings.language] || translations.en;
+            
+            // Safe DOM updates
+            const updateText = (id, text) => { const el = document.getElementById(id); if (el) el.innerText = text; };
+
+            updateText('appTitle', t.appTitle);
+            updateText('headerTitle', t.headerTitle);
+            updateText('btnSettings', t.btnSettings);
+            updateText('lblTotalSpend', t.lblTotalSpend);
+            updateText('lblRemaining', t.lblRemaining);
+            updateText('lblDaily', t.lblDaily);
+            updateText('lblHighExp', t.lblHighExp);
+            updateText('lblHighlighted', t.lblHighlighted);
+            updateText('lblProgress', t.lblProgress);
+            updateText('lblSpent', t.lblSpent);
+            updateText('lblLimit', t.lblLimit);
+            updateText('lblAddTitle', t.lblAddTitle);
+            updateText('lblFormDate', t.lblFormDate);
+            updateText('lblFormCat', t.lblFormCat);
+            updateText('lblFormAmount', t.lblFormAmount);
+            updateText('lblFormDesc', t.lblFormDesc);
+            
+            const addBtn = document.getElementById('btnAddBtn');
+            if(addBtn) addBtn.innerHTML = `<i class="fa-solid fa-plus"></i> ${t.btnAddBtn}`;
+
+            updateText('lblCatBreakdown', t.lblCatBreakdown);
+            updateText('lblHistory', t.lblHistory);
+            updateText('lblShowAll', t.lblShowAll);
+            updateText('lblExport', t.lblExport);
+            updateText('tblDate', t.tblDate);
+            updateText('tblDesc', t.tblDesc);
+            updateText('tblCat', t.tblCat);
+            updateText('tblAmount', t.tblAmount);
+            updateText('tblAction', t.tblAction);
+
+            // Update Category Dropdown Options
+            const catSelect = document.getElementById('expenseCategory');
+            if (catSelect) {
+                const currentSelectedCat = catSelect.value;
+                catSelect.innerHTML = '';
+                Object.keys(settings.emojis).forEach(catKey => {
+                    const opt = document.createElement('option');
+                    opt.value = catKey;
+                    opt.innerText = `${settings.emojis[catKey]} ${t.categories[catKey] || catKey}`;
+                    catSelect.appendChild(opt);
+                });
+                if (currentSelectedCat) catSelect.value = currentSelectedCat;
+            }
+
+            const { start, end } = getActivePeriodRange();
+            updateText('periodDisplay', `${settings.language === 'zh' ? '預算周期' : 'Period'}: ${formatDateStr(start)} – ${formatDateStr(end)}`);
+
+            const showAllToggle = document.getElementById('showAllToggle');
+            const showAll = showAllToggle ? showAllToggle.checked : false;
+
+            const filteredExpenses = expenses.filter(exp => {
+                if (showAll) return true;
+                const d = new Date(exp.date);
+                return d >= start && d <= end;
+            });
+
+            const periodExpenses = expenses.filter(exp => {
+                const d = new Date(exp.date);
+                return d >= start && d <= end;
+            });
+
+            const totalSpend = periodExpenses.reduce((sum, item) => sum + Number(item.amount), 0);
+            const budgetLimit = Number(settings.limit);
+            const remaining = budgetLimit - totalSpend;
+            const highCount = periodExpenses.filter(item => Number(item.amount) > 100).length;
+
+            const today = new Date();
+            today.setHours(0,0,0,0);
+            
+            let daysRemaining = 0;
+            let iterDate = new Date(Math.max(today, start));
+            while(iterDate <= end) {
+                daysRemaining++;
+                iterDate.setDate(iterDate.getDate() + 1);
+            }
+            daysRemaining = Math.max(1, daysRemaining);
+            const dailyAllowance = remaining > 0 ? (remaining / daysRemaining) : 0;
+
+            updateText('totalSpend', `$${totalSpend.toFixed(2)}`);
+            updateText('totalCount', `${periodExpenses.length} ${settings.language === 'zh' ? '筆交易記錄' : 'transactions'}`);
+            
+            updateText('remainingBudget', `$${Math.abs(remaining).toFixed(2)}${remaining < 0 ? (settings.language === 'zh' ? ' 超支' : ' Over') : ''}`);
+
+            const cardRemaining = document.getElementById('cardRemaining');
+            const budgetIcon = document.getElementById('budgetIcon');
+            const statusText = document.getElementById('budgetStatusText');
+
+            if (cardRemaining && budgetIcon && statusText) {
+                if (remaining < 0) {
+                    cardRemaining.className = "bg-gradient-to-br from-rose-600 to-rose-700 text-white p-4 rounded-2xl shadow-md border border-rose-400/30 flex flex-col justify-between transition-all";
+                    budgetIcon.className = 'fa-solid fa-triangle-exclamation text-rose-200 bg-white/10 p-1.5 rounded-lg';
+                    statusText.innerText = t.statusOver;
+                } else if (totalSpend / budgetLimit >= 0.8) {
+                    cardRemaining.className = "bg-gradient-to-br from-amber-500 to-amber-600 text-white p-4 rounded-2xl shadow-md border border-amber-400/30 flex flex-col justify-between transition-all";
+                    budgetIcon.className = 'fa-solid fa-circle-exclamation text-amber-200 bg-white/10 p-1.5 rounded-lg';
+                    statusText.innerText = t.statusNearing;
+                } else {
+                    cardRemaining.className = "bg-gradient-to-br from-emerald-500 to-emerald-600 text-white p-4 rounded-2xl shadow-md border border-emerald-400/30 flex flex-col justify-between transition-all";
+                    budgetIcon.className = 'fa-solid fa-piggy-bank text-emerald-200 bg-white/10 p-1.5 rounded-lg';
+                    statusText.innerText = t.statusOnTrack;
+                }
+            }
+
+            updateText('dailyAllowance', `$${dailyAllowance.toFixed(2)}`);
+            updateText('daysRemainingText', `${daysRemaining} ${settings.language === 'zh' ? '天剩餘' : 'days left'}`);
+            updateText('highExpenseCount', highCount);
+
+            const percentage = budgetLimit > 0 ? Math.min(100, Math.round((totalSpend / budgetLimit) * 100)) : 0;
+            updateText('budgetPercentage', `${percentage}%`);
+            
+            const progressBar = document.getElementById('progressBar');
+            if (progressBar) {
+                progressBar.style.width = `${percentage}%`;
+                if (remaining < 0) progressBar.className = 'bg-rose-500 h-3 rounded-full transition-all duration-500';
+                else if (percentage >= 80) progressBar.className = 'bg-amber-500 h-3 rounded-full transition-all duration-500';
+                else progressBar.className = 'bg-emerald-500 h-3 rounded-full transition-all duration-500';
+            }
+
+            updateText('progressSpent', `$${totalSpend.toFixed(2)}`);
+            updateText('progressLimit', `$${budgetLimit.toFixed(2)}`);
+
+            // Render Table
+            const tbody = document.getElementById('expenseTableBody');
+            const emptyState = document.getElementById('emptyState');
+            if (tbody) {
+                tbody.innerHTML = '';
+
+                if (filteredExpenses.length === 0) {
+                    if(emptyState) {
+                        emptyState.classList.remove('hidden');
+                        emptyState.innerText = settings.language === 'zh' ? '此周期內尚無開支記錄，請在上方新增！' : 'No expenses recorded for this period yet. Add one above!';
+                    }
+                } else {
+                    if(emptyState) emptyState.classList.add('hidden');
+                    filteredExpenses.sort((a,b) => new Date(b.date) - new Date(a.date));
+
+                    filteredExpenses.forEach(item => {
+                        const isHigh = Number(item.amount) > 100;
+                        const emoji = settings.emojis[item.category] || '📦';
+                        const catLocalized = (translations[settings.language].categories[item.category]) || item.category;
+
+                        const tr = document.createElement('tr');
+                        tr.className = `border-b border-slate-50 hover:bg-slate-50/80 transition ${isHigh ? 'bg-rose-50/40' : ''}`;
+                        tr.innerHTML = `
+                            <td class="py-3 text-slate-600 font-medium">${item.date}</td>
+                            <td class="py-3 text-slate-900">${item.description}</td>
+                            <td class="py-3"><span class="bg-slate-100 text-slate-700 px-2.5 py-1 rounded-lg text-xs font-semibold inline-flex items-center gap-1.5"><span>${emoji}</span> <span>${catLocalized}</span></span></td>
+                            <td class="py-3 text-right font-bold ${isHigh ? 'text-rose-600' : 'text-slate-900'}">$${Number(item.amount).toFixed(2)} ${isHigh ? '<span class="text-[10px] bg-rose-100 text-rose-700 px-1.5 py-0.5 rounded ml-1 font-bold">&gt;$100</span>' : ''}</td>
+                            <td class="py-3 text-center">
+                                <button onclick="deleteExpense(${item.id})" class="text-slate-400 hover:text-rose-600 p-1.5 rounded-lg transition" title="Delete">
+                                    <i class="fa-solid fa-trash-can text-xs"></i>
+                                </button>
+                            </td>
+                        `;
+                        tbody.appendChild(tr);
+                    });
+                }
+            }
+
+            renderChart(periodExpenses);
+        }
+
+        function renderChart(periodExpenses) {
+            const canvasEl = document.getElementById('categoryChart');
+            if (!canvasEl) return;
+            const ctx = canvasEl.getContext('2d');
+
+            const categories = {};
+            periodExpenses.forEach(item => {
+                const emoji = settings.emojis[item.category] || '📦';
+                const catLocalized = (translations[settings.language].categories[item.category]) || item.category;
+                const labelName = `${emoji} ${catLocalized}`;
+                categories[labelName] = (categories[labelName] || 0) + Number(item.amount);
+            });
+
+            const labels = Object.keys(categories);
+            const data = Object.values(categories);
+
+            if (categoryChartInstance) {
+                categoryChartInstance.destroy();
+            }
+
+            if (labels.length === 0) {
+                categoryChartInstance = new Chart(ctx, {
+                    type: 'doughnut',
+                    data: {
+                        labels: [settings.language === 'zh' ? '無數據' : 'No Data'],
+                        datasets: [{ data: [1], backgroundColor: ['#e2e8f0'] }]
+                    },
+                    options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } } }
+                });
+                return;
+            }
+
+            categoryChartInstance = new Chart(ctx, {
+                type: 'doughnut',
+                data: {
+                    labels: labels,
+                    datasets: [{
+                        data: data,
+                        backgroundColor: ['#6366f1', '#3b82f6', '#10b981', '#f59e0b', '#ec4899', '#8b5cf6'],
+                        borderWidth: 2,
+                        borderColor: '#ffffff'
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: { position: 'bottom', labels: { boxWidth: 12, font: { size: 11 } } }
+                    },
+                    cutout: '65%'
+                }
+            });
+        }
+
+        function addExpense(e) {
+            e.preventDefault();
+            const dateVal = document.getElementById('expenseDate').value;
+            const catVal = document.getElementById('expenseCategory').value;
+            const amtVal = parseFloat(document.getElementById('expenseAmount').value);
+            const descVal = document.getElementById('expenseDesc').value;
+
+            if (!dateVal || !catVal || isNaN(amtVal) || !descVal) return;
+
+            const newExp = {
+                id: Date.now(),
+                date: dateVal,
+                category: catVal,
+                amount: amtVal,
+                description: descVal
+            };
+            expenses.push(newExp);
+            document.getElementById('expenseAmount').value = '';
+            document.getElementById('expenseDesc').value = '';
+            renderApp();
+        }
+
+        function deleteExpense(id) {
+            expenses = expenses.filter(item => item.id !== id);
+            renderApp();
+        }
+
+        function openSettingsModal() {
+            const t = translations[settings.language] || translations.en;
+            const updateText = (id, text) => { const el = document.getElementById(id); if (el) el.innerText = text; };
+
+            updateText('modalTitle', `<i class="fa-solid fa-gear text-indigo-600"></i> ${t.modalTitle}`);
+            updateText('lblModalLimit', t.lblModalLimit);
+            updateText('lblModalLang', t.lblModalLang);
+            updateText('lblModalMode', t.lblModalMode);
+            updateText('lblModalStart', t.lblModalStart);
+            updateText('lblModalEnd', t.lblModalEnd);
+            updateText('lblModalCalMonth', t.lblModalCalMonth);
+            updateText('lblEmojiCustomizer', t.lblEmojiCustomizer);
+            updateText('btnCancel', t.btnCancel);
+            updateText('btnSave', t.btnSave);
+
+            const limitEl = document.getElementById('modalBudgetLimit');
+            if(limitEl) limitEl.value = settings.limit;
+            
+            const langEl = document.getElementById('modalLanguage');
+            if(langEl) langEl.value = settings.language;
+            
+            const modeEl = document.getElementById('modalPeriodMode');
+            if(modeEl) modeEl.value = settings.mode;
+            
+            const calEl = document.getElementById('modalCalendarMonth');
+            if(calEl) calEl.value = settings.calendarMonth;
+            
+            const startEl = document.getElementById('modalStartDate');
+            if(startEl) startEl.value = settings.startDate;
+            
+            const endEl = document.getElementById('modalEndDate');
+            if(endEl) endEl.value = settings.endDate;
+            
+            // Build Emoji Customizer Inputs
+            const emojiContainer = document.getElementById('emojiConfigContainer');
+            if (emojiContainer) {
+                emojiContainer.innerHTML = '';
+                Object.keys(settings.emojis).forEach(catKey => {
+                    const catLocalized = translations[settings.language].categories[catKey] || catKey;
+                    const div = document.createElement('div');
+                    div.className = "flex items-center justify-between bg-slate-50 border border-slate-200 rounded-xl px-3 py-2";
+                    div.innerHTML = `
+                        <span class="text-xs font-medium text-slate-700 truncate pr-2">${catLocalized}</span>
+                        <input type="text" id="emoji_${catKey}" value="${settings.emojis[catKey]}" maxlength="2" class="w-12 text-center bg-white border border-slate-300 rounded-lg py-1 text-sm font-bold focus:outline-none focus:ring-2 focus:ring-indigo-500">
+                    `;
+                    emojiContainer.appendChild(div);
+                });
+            }
+
+            togglePeriodMode();
+            const modal = document.getElementById('settingsModal');
+            if(modal) modal.classList.remove('hidden');
+        }
+
+        function closeSettingsModal() {
+            const modal = document.getElementById('settingsModal');
+            if(modal) modal.classList.add('hidden');
+        }
+
+        function togglePeriodMode() {
+            const modeEl = document.getElementById('modalPeriodMode');
+            const customFields = document.getElementById('customDateFields');
+            if (!modeEl || !customFields) return;
+            if (modeEl.value === 'custom') {
+                customFields.classList.remove('hidden');
+            } else {
+                customFields.classList.add('hidden');
+            }
+        }
+
+        function saveSettings() {
+            const limitEl = document.getElementById('modalBudgetLimit');
+            const langEl = document.getElementById('modalLanguage');
+            const modeEl = document.getElementById('modalPeriodMode');
+            const calEl = document.getElementById('modalCalendarMonth');
+            const startEl = document.getElementById('modalStartDate');
+            const endEl = document.getElementById('modalEndDate');
+
+            if(limitEl) settings.limit = parseFloat(limitEl.value) || 0;
+            if(langEl) settings.language = langEl.value;
+            if(modeEl) settings.mode = modeEl.value;
+            if(calEl) settings.calendarMonth = calEl.value || '2026-11';
+            if(startEl) settings.startDate = startEl.value;
+            if(endEl) settings.endDate = endEl.value;
+            
+            // Save Emojis
+            Object.keys(settings.emojis).forEach(catKey => {
+                const input = document.getElementById(`emoji_${catKey}`);
+                if (input && input.value.trim() !== '') {
+                    settings.emojis[catKey] = input.value.trim();
+                }
+            });
+
+            closeSettingsModal();
+            renderApp();
+        }
+
+        function exportCSV() {
+            let csv = 'Date,Category,Amount,Description\n';
+            expenses.forEach(item => {
+                csv += `"${item.date}","${item.category}",${item.amount},"${item.description.replace(/"/g, '""')}"\n`;
+            });
+            const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = 'expenses_export.csv';
+            a.click();
+            URL.revokeObjectURL(url);
+        }
+
+        // Initialize app on DOM load
+        document.addEventListener('DOMContentLoaded', () => {
+            if(!document.getElementById('expenseDate').value) {
+                document.getElementById('expenseDate').valueAsDate = new Date();
+            }
+            renderApp();
+        });
+        
+        // Immediate fallback call
+        renderApp();
+    </script>
+</body>
+</html>
